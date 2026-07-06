@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install repo-airlock (editable, with dev extras)
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest -v
+
+      - name: Self-scan (airlock scans itself)
+        # Scans the working tree (what would go public) with the checked-in
+        # baseline that acknowledges this repo's intentional fake fixtures and
+        # the detectors' own CIDR-literal source. We do NOT pass --history here:
+        # the test fixtures deliberately contain fake secrets, so once committed
+        # they legitimately appear in git history — flagging them is correct tool
+        # behavior but expected noise for THIS repo specifically. `airlock scan .
+        # --history` is exactly the command an end user runs on their own repo.
+        run: python -m repo_airlock.cli scan . --fail-on high --baseline .airlock-baseline.json

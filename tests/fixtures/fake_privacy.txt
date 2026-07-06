@@ -1,0 +1,20 @@
+# FAKE example privacy leaks for testing repo-airlock detectors.
+
+contact_email = "jane.doe.testfixture@gmail.com"
+support_phone = "555-201-3948"
+alt_phone = (555) 201-3948
+
+windows_path = "C:\Users\jdoe_fixture\Desktop\project\config.py"
+mac_path = "/Users/jdoe_fixture/projects/app/settings.py"
+linux_path = "/home/jdoe_fixture/app/settings.py"
+
+internal_host = "db01.internal"
+another_internal = "build.corp"
+
+private_ip_a = "10.0.5.12"
+private_ip_b = "172.16.4.9"
+private_ip_c = "192.168.1.50"
+tailscale_ip = "100.64.0.42"
+
+placeholder_email = "someone@example.com"
+placeholder_path = "C:\Users\username\Desktop"
