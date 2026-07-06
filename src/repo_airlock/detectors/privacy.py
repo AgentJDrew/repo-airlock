@@ -12,10 +12,20 @@ from __future__ import annotations
 import ipaddress
 import re
 
+from repo_airlock.detectors.base import iter_scannable_lines
 from repo_airlock.findings import Finding, Severity
 from repo_airlock.redact import redact
 
-_EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+# Bounded quantifiers throughout: the local part, each domain label, and the
+# TLD are all length-capped (per RFC 1035/5321 limits: label <= 63, local <= 64)
+# and the number of domain labels is capped. This keeps the match LINEAR in the
+# input length. An unbounded `+`/`.+` version backtracks quadratically on a long
+# line of dotted content that never resolves to a valid address (e.g. a minified
+# blob or a crafted file), which is a denial-of-service vector for a scanner that
+# runs against arbitrary, untrusted file content and git-history diffs.
+_EMAIL_RE = re.compile(
+    r"\b[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,10}\.[A-Za-z]{2,24}\b"
+)
 
 # Common placeholder/example domains and addresses we don't want to flag.
 _EMAIL_ALLOWLIST_DOMAINS = {
@@ -49,8 +59,11 @@ _GENERIC_USER_PLACEHOLDERS = {
 }
 
 # Internal-looking hostnames, e.g. a machine name ending in .internal/.corp/.local
+# Label length (<=63) and label count (<=10) are bounded so the leading
+# `(?:label\.)` group can't backtrack quadratically on a long run of dotted
+# tokens that never reaches a matching suffix (ReDoS vector — see _EMAIL_RE note).
 _INTERNAL_HOSTNAME_RE = re.compile(
-    r"\b(?:[A-Za-z0-9-]+\.)+(?:internal|corp|local|lan|intranet|home\.arpa)\b",
+    r"\b(?:[A-Za-z0-9-]{1,63}\.){1,10}(?:internal|corp|local|lan|intranet|home\.arpa)\b",
     re.IGNORECASE,
 )
 
@@ -84,7 +97,7 @@ class EmailDetector:
 
     def scan_text(self, path: str, text: str) -> list[Finding]:
         findings: list[Finding] = []
-        for lineno, line in enumerate(text.splitlines(), start=1):
+        for lineno, line in iter_scannable_lines(text):
             for m in _EMAIL_RE.finditer(line):
                 email = m.group(0)
                 domain = email.rsplit("@", 1)[-1].lower()
@@ -109,7 +122,7 @@ class PhoneNumberDetector:
 
     def scan_text(self, path: str, text: str) -> list[Finding]:
         findings: list[Finding] = []
-        for lineno, line in enumerate(text.splitlines(), start=1):
+        for lineno, line in iter_scannable_lines(text):
             for m in _PHONE_RE.finditer(line):
                 digits = re.sub(r"\D", "", m.group(0))
                 if len(digits) < 10:
@@ -135,7 +148,7 @@ class UserPathDetector:
 
     def scan_text(self, path: str, text: str) -> list[Finding]:
         findings: list[Finding] = []
-        for lineno, line in enumerate(text.splitlines(), start=1):
+        for lineno, line in iter_scannable_lines(text):
             for pattern, kind in (
                 (_WIN_USER_PATH_RE, "Windows"),
                 (_MAC_USER_PATH_RE, "macOS"),
@@ -170,7 +183,7 @@ class InternalHostnameDetector:
 
     def scan_text(self, path: str, text: str) -> list[Finding]:
         findings: list[Finding] = []
-        for lineno, line in enumerate(text.splitlines(), start=1):
+        for lineno, line in iter_scannable_lines(text):
             for m in _INTERNAL_HOSTNAME_RE.finditer(line):
                 findings.append(
                     Finding(
@@ -191,7 +204,7 @@ class PrivateIPDetector:
 
     def scan_text(self, path: str, text: str) -> list[Finding]:
         findings: list[Finding] = []
-        for lineno, line in enumerate(text.splitlines(), start=1):
+        for lineno, line in iter_scannable_lines(text):
             for m in _IPV4_RE.finditer(line):
                 reason = _is_private_or_special_ip(m.group(0))
                 if reason is None:

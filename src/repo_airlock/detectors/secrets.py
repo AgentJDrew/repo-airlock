@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 
+from repo_airlock.detectors.base import iter_scannable_lines
 from repo_airlock.findings import Finding, Severity
 from repo_airlock.redact import redact
 
@@ -98,8 +99,7 @@ class KnownTokenDetector:
 
     def scan_text(self, path: str, text: str) -> list[Finding]:
         findings: list[Finding] = []
-        lines = text.splitlines()
-        for lineno, line in enumerate(lines, start=1):
+        for lineno, line in iter_scannable_lines(text):
             for token_id, description, pattern in _KNOWN_PATTERNS:
                 for m in pattern.finditer(line):
                     matched = m.group(0)
@@ -125,8 +125,7 @@ class GenericAssignmentDetector:
 
     def scan_text(self, path: str, text: str) -> list[Finding]:
         findings: list[Finding] = []
-        lines = text.splitlines()
-        for lineno, line in enumerate(lines, start=1):
+        for lineno, line in iter_scannable_lines(text):
             for m in _GENERIC_ASSIGNMENT.finditer(line):
                 value = m.group("value")
                 if _looks_like_placeholder(value):
@@ -160,8 +159,7 @@ class EntropyDetector:
 
     def scan_text(self, path: str, text: str) -> list[Finding]:
         findings: list[Finding] = []
-        lines = text.splitlines()
-        for lineno, line in enumerate(lines, start=1):
+        for lineno, line in iter_scannable_lines(text):
             # Skip lines already caught by more specific detectors to avoid noise.
             for m in _ENTROPY_STRING_RE.finditer(line):
                 value = m.group(1)

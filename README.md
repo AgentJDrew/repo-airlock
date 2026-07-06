@@ -166,6 +166,12 @@ jobs:
   directories (`.venv`, `node_modules`, etc.) so you're not drowned in third-party false positives.
 - **Redaction is non-negotiable.** Every finding shows `first4...last4` of a match, never the full
   value — in console output, Markdown, and JSON alike.
+- **Hardened against hostile input.** The scanner reads arbitrary, untrusted file content and
+  `git log -p` output, so it's an attack surface itself. Every detector regex uses bounded
+  quantifiers (no catastrophic backtracking), each line is length-capped before it reaches the
+  regex engine, whole-file size is capped, binary/non-UTF-8 files are skipped, and the git
+  subprocesses use fixed argument lists (never a shell) with timeouts — so a crafted or malicious
+  repo can't hang, OOM, or inject a command.
 
 ## Testing / fake fixtures
 
